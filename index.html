@@ -1713,6 +1713,115 @@
         border-left: 4px solid var(--primary-color);
       }
 
+      .paste-upload-notice {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 10000;
+        width: min(420px, calc(100vw - 32px));
+        display: grid;
+        grid-template-columns: 44px 1fr auto;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border: 1px solid rgba(138, 75, 255, 0.22);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 18px 45px rgba(47, 50, 67, 0.2);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        animation: pasteNoticeIn 0.28s ease;
+      }
+
+      html[data-theme="dark"] .paste-upload-notice {
+        background: rgba(20, 29, 49, 0.96);
+        border-color: rgba(154, 169, 255, 0.28);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42);
+      }
+
+      .paste-notice-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        background: linear-gradient(135deg, #7c5cff, #37bdf8);
+        box-shadow: 0 10px 22px rgba(124, 92, 255, 0.25);
+      }
+
+      .paste-upload-notice.success .paste-notice-icon {
+        background: linear-gradient(135deg, #21a67a, #67c23a);
+      }
+
+      .paste-upload-notice.error .paste-notice-icon {
+        background: linear-gradient(135deg, #df4a58, #f56c6c);
+      }
+
+      .paste-notice-content {
+        min-width: 0;
+      }
+
+      .paste-notice-title {
+        margin-bottom: 5px;
+        font-size: 0.98em;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .paste-notice-message {
+        color: var(--text-secondary);
+        font-size: 0.88em;
+        line-height: 1.5;
+      }
+
+      .paste-notice-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .paste-notice-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 26px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: rgba(138, 75, 255, 0.08);
+        color: var(--text-secondary);
+        font-size: 0.78em;
+        white-space: nowrap;
+      }
+
+      .paste-notice-close {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 2px;
+        line-height: 1;
+        transition: var(--transition);
+      }
+
+      .paste-notice-close:hover {
+        color: var(--text-primary);
+        transform: scale(1.08);
+      }
+
+      @keyframes pasteNoticeIn {
+        from {
+          opacity: 0;
+          transform: translateY(14px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
       @keyframes slideIn {
         from {
           transform: translateX(100%);
@@ -2021,6 +2130,20 @@
           max-width: 300px !important;
         }
 
+        .paste-upload-notice {
+          right: 12px;
+          bottom: 12px;
+          grid-template-columns: 38px 1fr auto;
+          gap: 10px;
+          padding: 12px;
+        }
+
+        .paste-notice-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+        }
+
         .el-dialog {
           width: 92% !important;
           margin: 8vh auto !important;
@@ -2185,7 +2308,7 @@
               formatSize(guestUploadConfig.maxFileSize) }}</span
             >
             <span v-else style="color: var(--text-muted); font-size: 0.85em">
-              Max {{ currentUploadLimitLabel }} per file for selected storage
+              当前存储单文件上限：{{ currentUploadLimitLabel }}
             </span>
           </div>
 
@@ -2205,8 +2328,7 @@
               }}，不支持分片上传
             </div>
             <div class="upload-hint" v-else>
-              Supports images, videos, audio, and documents. Current limit:
-              {{ currentUploadLimitLabel }}.
+              支持图片、视频、音频和文档。当前上限：{{ currentUploadLimitLabel }}。
             </div>
             <input
               type="file"
@@ -2431,7 +2553,7 @@
             </button>
             <button class="method-btn" @click="showUrlInput = !showUrlInput">
               <i class="fas fa-link"></i>
-              <span>URL上传</span>
+              <span>URL 上传</span>
             </button>
           </div>
 
@@ -2440,7 +2562,7 @@
             <input
               type="text"
               v-model="urlToUpload"
-              placeholder="输入图片URL地址..."
+              placeholder="输入图片或文件 URL 地址..."
               @keyup.enter="uploadFromUrl"
             />
             <el-button
@@ -3017,6 +3139,38 @@
         </div>
       </div>
 
+      <div
+        class="paste-upload-notice"
+        v-if="pasteUploadNotice"
+        :class="pasteUploadNotice.type"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="paste-notice-icon">
+          <i :class="getPasteNoticeIcon(pasteUploadNotice.type)"></i>
+        </div>
+        <div class="paste-notice-content">
+          <div class="paste-notice-title">{{ pasteUploadNotice.title }}</div>
+          <div class="paste-notice-message">{{ pasteUploadNotice.message }}</div>
+          <div class="paste-notice-meta" v-if="pasteUploadNotice.fileCount">
+            <span><i class="fas fa-layer-group"></i>{{ pasteUploadNotice.fileCount }} 个文件</span>
+            <span><i class="fas fa-weight-hanging"></i>{{ pasteUploadNotice.totalSize }}</span>
+            <span><i class="fas fa-database"></i>{{ pasteUploadNotice.storageTarget }}</span>
+            <span v-if="pasteUploadNotice.folderPath">
+              <i class="fas fa-folder"></i>{{ pasteUploadNotice.folderPath }}
+            </span>
+          </div>
+        </div>
+        <button
+          class="paste-notice-close"
+          type="button"
+          @click="dismissPasteUploadNotice"
+          title="关闭提醒"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
       <!-- Toast 容器 -->
       <div class="toast-container">
         <div
@@ -3046,6 +3200,10 @@
           urlUploading: false,
           pendingUploadBatch: null,
           pendingCompressionChoice: "original",
+          pasteUploadNotice: null,
+          pasteUploadNoticeTimer: null,
+          globalPasteHandler: null,
+          globalKeydownHandler: null,
           imageUploadDecision: "original",
           imageCompress: {
             enabled: false,
@@ -3260,32 +3418,137 @@
             this.prepareFilesForUpload(files);
           },
 
+          getClipboardFileExtension(mimeType, fallback = "bin") {
+            const type = String(mimeType || "").split(";")[0].toLowerCase();
+            const map = {
+              "image/jpeg": "jpg",
+              "image/png": "png",
+              "image/webp": "webp",
+              "image/gif": "gif",
+              "image/bmp": "bmp",
+              "image/svg+xml": "svg",
+              "image/avif": "avif",
+              "video/mp4": "mp4",
+              "video/webm": "webm",
+              "audio/mpeg": "mp3",
+              "audio/wav": "wav",
+              "audio/ogg": "ogg",
+              "application/pdf": "pdf",
+              "application/zip": "zip",
+              "text/plain": "txt",
+            };
+            return map[type] || type.split("/").pop() || fallback;
+          },
+
+          normalizeClipboardFile(file, index = 0, prefix = "paste") {
+            const name = String(file.name || "").trim();
+            if (name && !/^image\.(png|jpe?g|gif|webp)$/i.test(name)) {
+              return file;
+            }
+
+            const ext = this.getClipboardFileExtension(file.type);
+            const safeExt = String(ext || "bin").replace(/[^a-z0-9]/gi, "") || "bin";
+            return new File(
+              [file],
+              `${prefix}_${Date.now()}_${index + 1}.${safeExt}`,
+              {
+                type: file.type || "application/octet-stream",
+                lastModified: file.lastModified || Date.now(),
+              },
+            );
+          },
+
+          extractFilesFromClipboardData(clipboardData, prefix = "paste") {
+            const files = [];
+            const seen = new Set();
+            const pushFile = (file, index) => {
+              if (!file) return;
+              const key = `${file.name || ""}:${file.type || ""}:${file.size}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              files.push(this.normalizeClipboardFile(file, index, prefix));
+            };
+
+            Array.from(clipboardData?.files || []).forEach(pushFile);
+            Array.from(clipboardData?.items || []).forEach((item, index) => {
+              if (item.kind === "file") {
+                pushFile(item.getAsFile(), index);
+              }
+            });
+
+            return files;
+          },
+
+          shouldIgnorePasteTarget(target) {
+            const el = target?.closest?.(
+              "input, textarea, select, [contenteditable='true']",
+            );
+            return Boolean(el);
+          },
+
+          async queuePastedFiles(files, sourceLabel = "Ctrl+V") {
+            if (!files || files.length === 0) {
+              this.showPasteUploadNotice({
+                type: "error",
+                title: "没有检测到可上传文件",
+                message: "请先复制图片或文件，再使用粘贴上传。",
+              });
+              return;
+            }
+
+            const result = await this.prepareFilesForUpload(files);
+            if (!result || result.fileCount === 0) {
+              this.showPasteUploadNotice({
+                type: "error",
+                title: "粘贴内容未加入队列",
+                message: "文件可能超过当前存储上限，或剪贴板内容不支持上传。",
+              });
+              return;
+            }
+
+            this.showPasteUploadNotice({
+              type: "success",
+              title: result.pending ? "已识别粘贴文件" : "粘贴上传已加入队列",
+              message: result.pending
+                ? `通过 ${sourceLabel} 识别到文件，请在确认窗口选择图片处理方式。`
+                : `通过 ${sourceLabel} 添加成功，系统将按当前存储配置开始上传。`,
+              fileCount: result.fileCount,
+              totalSize: this.formatSize(result.totalSize),
+              storageTarget: result.storageTarget,
+              folderPath: result.folderPath,
+            });
+          },
+
           // 粘贴上传
           async pasteFromClipboard() {
             try {
               const items = await navigator.clipboard.read();
               const files = [];
-              for (const item of items) {
-                for (const type of item.types) {
-                  if (type.startsWith("image/")) {
+              for (const [itemIndex, item] of items.entries()) {
+                for (const type of item.types || []) {
+                  if (type === "text/plain" || type === "text/html") continue;
+                  try {
                     const blob = await item.getType(type);
-                    const ext = type.split("/")[1];
+                    if (!blob || !blob.size) continue;
+                    const ext = this.getClipboardFileExtension(type);
                     const file = new File(
                       [blob],
-                      `clipboard_${Date.now()}.${ext}`,
+                      `clipboard_${Date.now()}_${itemIndex + 1}.${ext}`,
                       { type },
                     );
                     files.push(file);
+                  } catch (error) {
+                    // 有些剪贴板类型只暴露名称，读取失败时跳过该项。
                   }
                 }
               }
-              if (files.length > 0) {
-                this.prepareFilesForUpload(files);
-              } else {
-                this.showToast("剪贴板中没有图片", "error");
-              }
+              await this.queuePastedFiles(files, "粘贴按钮");
             } catch (err) {
-              this.showToast("无法访问剪贴板，请直接粘贴图片", "error");
+              this.showPasteUploadNotice({
+                type: "error",
+                title: "无法读取剪贴板",
+                message: "浏览器拒绝访问剪贴板时，请直接按 Ctrl/Cmd + V 粘贴文件或图片。",
+              });
             }
           },
 
@@ -3461,8 +3724,8 @@
                 : limit.maxBytes;
             if (maxBytes && item.file.size > maxBytes) {
               throw new Error(
-                `${this.getItemStorageTarget(item)} limit is ${this.formatSize(maxBytes)}. ` +
-                  `Use R2/S3/WebDAV/GitHub for larger browser uploads.`
+                `${this.getItemStorageTarget(item)} 单文件上限为 ${this.formatSize(maxBytes)}。` +
+                  `较大的浏览器上传请切换到 R2、S3、WebDAV 或 GitHub。`
               );
             }
           },
@@ -3626,12 +3889,15 @@
 
           async prepareFilesForUpload(files) {
             const valid = this.validateUploadFiles(files);
-            if (!valid || valid.length === 0) return;
+            if (!valid || valid.length === 0) {
+              return { fileCount: 0, totalSize: 0, pending: false };
+            }
 
             const context = this.createUploadContext();
             const imageCount = valid.filter((file) =>
               this.isCompressibleImage(file),
             ).length;
+            const totalSize = valid.reduce((sum, file) => sum + (file.size || 0), 0);
 
             if (imageCount > 0) {
               if (this.imageUploadDecision !== "ask") {
@@ -3642,14 +3908,28 @@
                   ),
                   context,
                 );
-                return;
+                return {
+                  fileCount: valid.length,
+                  imageCount,
+                  totalSize,
+                  pending: false,
+                  storageTarget: context.storageTarget,
+                  folderPath: context.folderPath,
+                };
               }
 
               this.pendingUploadBatch = { files: valid, context };
               this.pendingCompressionChoice = this.imageCompress.enabled
                 ? "compress"
                 : "original";
-              return;
+              return {
+                fileCount: valid.length,
+                imageCount,
+                totalSize,
+                pending: true,
+                storageTarget: context.storageTarget,
+                folderPath: context.folderPath,
+              };
             }
 
             await this.processFiles(
@@ -3657,6 +3937,14 @@
               this.snapshotImageCompressOptions(false),
               context,
             );
+            return {
+              fileCount: valid.length,
+              imageCount,
+              totalSize,
+              pending: false,
+              storageTarget: context.storageTarget,
+              folderPath: context.folderPath,
+            };
           },
 
           setPendingCompressionMode(mode) {
@@ -4790,6 +5078,42 @@
             }, 3000);
           },
 
+          showPasteUploadNotice(notice) {
+            if (this.pasteUploadNoticeTimer) {
+              clearTimeout(this.pasteUploadNoticeTimer);
+              this.pasteUploadNoticeTimer = null;
+            }
+            this.pasteUploadNotice = {
+              type: notice.type || "info",
+              title: notice.title || "粘贴上传",
+              message: notice.message || "",
+              fileCount: notice.fileCount || 0,
+              totalSize: notice.totalSize || "",
+              storageTarget: notice.storageTarget || this.storageTarget,
+              folderPath: notice.folderPath || "",
+            };
+            this.pasteUploadNoticeTimer = setTimeout(() => {
+              this.dismissPasteUploadNotice();
+            }, notice.type === "error" ? 6500 : 5200);
+          },
+
+          dismissPasteUploadNotice() {
+            if (this.pasteUploadNoticeTimer) {
+              clearTimeout(this.pasteUploadNoticeTimer);
+              this.pasteUploadNoticeTimer = null;
+            }
+            this.pasteUploadNotice = null;
+          },
+
+          getPasteNoticeIcon(type) {
+            const icons = {
+              success: "fas fa-clipboard-check",
+              error: "fas fa-triangle-exclamation",
+              info: "fas fa-paste",
+            };
+            return icons[type] || icons.info;
+          },
+
           getToastIcon(type) {
             const icons = {
               success: "fas fa-check-circle",
@@ -4987,38 +5311,51 @@
           this.loadHistory();
 
           // 全局粘贴事件
-          document.addEventListener("paste", async (e) => {
-            const items = e.clipboardData?.items;
-            if (!items) return;
+          this.globalPasteHandler = async (e) => {
+            const clipboardData = e.clipboardData;
+            if (!clipboardData) return;
 
-            const files = [];
-            for (const item of items) {
-              if (item.type.startsWith("image/")) {
-                const blob = item.getAsFile();
-                if (blob) {
-                  const ext = item.type.split("/")[1];
-                  const file = new File([blob], `paste_${Date.now()}.${ext}`, {
-                    type: item.type,
-                  });
-                  files.push(file);
-                }
-              }
+            const hasFilePayload =
+              Array.from(clipboardData.files || []).length > 0 ||
+              Array.from(clipboardData.items || []).some(
+                (item) => item.kind === "file",
+              );
+            if (this.shouldIgnorePasteTarget(e.target) && !hasFilePayload) {
+              return;
             }
+
+            const files = this.extractFilesFromClipboardData(
+              clipboardData,
+              "paste",
+            );
 
             if (files.length > 0) {
               e.preventDefault();
-              this.prepareFilesForUpload(files);
+              await this.queuePastedFiles(files, "Ctrl/Cmd + V");
             }
-          });
+          };
+          document.addEventListener("paste", this.globalPasteHandler);
 
           // 键盘快捷键
-          document.addEventListener("keydown", (e) => {
+          this.globalKeydownHandler = (e) => {
             // Ctrl+V 已通过 paste 事件处理
             // Escape 关闭预览
             if (e.key === "Escape" && this.previewData) {
               this.closePreview();
             }
-          });
+          };
+          document.addEventListener("keydown", this.globalKeydownHandler);
+        },
+        beforeDestroy() {
+          if (this.globalPasteHandler) {
+            document.removeEventListener("paste", this.globalPasteHandler);
+          }
+          if (this.globalKeydownHandler) {
+            document.removeEventListener("keydown", this.globalKeydownHandler);
+          }
+          if (this.pasteUploadNoticeTimer) {
+            clearTimeout(this.pasteUploadNoticeTimer);
+          }
         },
       });
     </script>
