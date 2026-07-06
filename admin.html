@@ -2257,6 +2257,40 @@
         const target = this.tableData.find((item) => item.name === name);
         if (target) target.selected = !target.selected;
       },
+      getFileMoveId(file) {
+        return String(file?.id || file?.name || file?.key || file?.metadata?.id || '').trim();
+      },
+      getFileMovePayload(file) {
+        return {
+          id: this.getFileMoveId(file),
+          name: file?.name || '',
+          key: file?.key || '',
+          fileName: file?.metadata?.fileName || '',
+          metadata: {
+            id: file?.metadata?.id || '',
+            fileId: file?.metadata?.fileId || '',
+            fileName: file?.metadata?.fileName || '',
+          },
+        };
+      },
+      findFileByMoveId(id) {
+        const target = String(id || '').trim();
+        if (!target) return null;
+        return this.tableData.find((file) => {
+          return (
+            this.getFileMoveId(file) === target ||
+            String(file?.name || '') === target ||
+            String(file?.id || '') === target
+          );
+        }) || null;
+      },
+      isRowInMoveSet(row, idSet) {
+        return (
+          idSet.has(this.getFileMoveId(row)) ||
+          idSet.has(String(row?.name || '')) ||
+          idSet.has(String(row?.id || ''))
+        );
+      },
       switchViewMode(mode) {
         if (!['grid', 'list'].includes(mode)) return;
         this.viewMode = mode;
@@ -2530,9 +2564,10 @@
             cancelButtonText: '取消',
           });
           const targetFolderPath = this.normalizeFolderPath(prompt.value || '');
-          const ids = this.selectedFiles.map((item) => item.name);
+          const filesPayload = this.selectedFiles.map((item) => this.getFileMovePayload(item));
+          const ids = filesPayload.map((item) => item.id).filter(Boolean);
           const hasEffectiveMove = ids.some((id) => {
-            const file = this.tableData.find((item) => item.name === id);
+            const file = this.findFileByMoveId(id);
             const current = this.normalizeFolderPath(file?.metadata?.folderPath || '');
             return current !== targetFolderPath;
           });
@@ -2549,15 +2584,15 @@
           previousFolders = this.cloneFoldersSnapshot();
           const normalizedCurrentFolder = this.normalizeFolderPath(this.folderPath);
           const movedRows = this.tableData
-            .filter((row) => idSet.has(row.name))
+            .filter((row) => this.isRowInMoveSet(row, idSet))
             .map((row) => ({
-              name: row.name,
+              name: this.getFileMoveId(row),
               sourceFolderPath: this.normalizeFolderPath(row?.metadata?.folderPath || ''),
             }));
 
           this.tableData = this.tableData
             .map((row) => {
-              if (!idSet.has(row.name)) return row;
+              if (!this.isRowInMoveSet(row, idSet)) return row;
               return {
                 ...row,
                 metadata: {
@@ -2596,9 +2631,12 @@
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, targetFolderPath }),
+            body: JSON.stringify({ ids, files: filesPayload, targetFolderPath }),
           }).then((r) => r.json());
           if (!result.success) throw new Error(result.error || '移动失败');
+          if (Number(result.moved || 0) === 0) {
+            throw new Error('后端没有移动任何文件，请刷新列表后重试');
+          }
           this.$message.success(`已移动 ${result.moved || 0} 个文件到 ${targetFolderPath || '根目录'}`);
           this.clearFolderCache();
           await this.fetchFolders();
@@ -2628,10 +2666,10 @@
       resolveDraggedIds(item) {
         if (!item || !item.name) return [];
         if (item.selected) {
-          const selected = this.selectedFiles.map((file) => file.name).filter(Boolean);
+          const selected = this.selectedFiles.map((file) => this.getFileMoveId(file)).filter(Boolean);
           if (selected.length > 0) return selected;
         }
-        return [item.name];
+        return [this.getFileMoveId(item)];
       },
       handleFileDragStart(item, event) {
         const ids = this.resolveDraggedIds(item);
@@ -2746,9 +2784,13 @@
           this.handleFileDragEnd();
           return;
         }
+        const filesPayload = ids
+          .map((id) => this.findFileByMoveId(id))
+          .filter(Boolean)
+          .map((file) => this.getFileMovePayload(file));
 
         const hasEffectiveMove = ids.some((id) => {
-          const file = this.tableData.find((item) => item.name === id);
+          const file = this.findFileByMoveId(id);
           const current = this.normalizeFolderPath(file?.metadata?.folderPath || '');
           return current !== targetFolderPath;
         });
@@ -2766,16 +2808,16 @@
         const previousFolders = this.cloneFoldersSnapshot();
         const normalizedCurrentFolder = this.normalizeFolderPath(this.folderPath);
         const movedRows = this.tableData
-          .filter((row) => idSet.has(row.name))
+          .filter((row) => this.isRowInMoveSet(row, idSet))
           .map((row) => ({
-            name: row.name,
+            name: this.getFileMoveId(row),
             sourceFolderPath: this.normalizeFolderPath(row?.metadata?.folderPath || ''),
           }));
 
         // 先本地更新，拖拽交互更流畅
         this.tableData = this.tableData
           .map((row) => {
-            if (!idSet.has(row.name)) return row;
+            if (!this.isRowInMoveSet(row, idSet)) return row;
             return {
               ...row,
               metadata: {
@@ -2816,9 +2858,12 @@
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, targetFolderPath }),
+            body: JSON.stringify({ ids, files: filesPayload, targetFolderPath }),
           }).then((r) => r.json());
           if (!result.success) throw new Error(result.error || '拖拽移动失败');
+          if (Number(result.moved || 0) === 0) {
+            throw new Error('后端没有移动任何文件，请刷新列表后重试');
+          }
           const folderLabel = targetFolderPath || '根目录';
           this.$message.success(`已移动 ${result.moved || 0} 个文件到 ${folderLabel}`);
           this.clearFolderCache();

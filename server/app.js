@@ -2498,6 +2498,15 @@ function createApp() {
     const targetFolderPath = normalizeFolderPath(body.targetFolderPath || body.path || '');
 
     const result = fileRepo.moveFiles(ids, targetFolderPath);
+    if (result.moved === 0) {
+      return jsonError(
+        c,
+        404,
+        'FILES_NOT_MOVED',
+        '没有找到可移动的文件，目录未变更。',
+        '请刷新文件列表后重试。'
+      );
+    }
     return c.json({
       success: true,
       ...result,
@@ -2513,6 +2522,15 @@ function createApp() {
     const targetFolderPath = normalizeFolderPath(body.targetFolderPath || body.folderPath || body.path || '');
 
     const result = fileRepo.moveFiles(ids, targetFolderPath);
+    if (result.moved === 0) {
+      return jsonError(
+        c,
+        404,
+        'FILES_NOT_MOVED',
+        '没有找到可移动的文件，目录未变更。',
+        '请刷新文件列表后重试。'
+      );
+    }
     return c.json({
       success: true,
       ...result,

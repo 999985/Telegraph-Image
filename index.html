@@ -3651,27 +3651,70 @@
             });
           },
 
+          normalizeUploadFolderList(folders = []) {
+            const map = new Map();
+            (Array.isArray(folders) ? folders : []).forEach((folder) => {
+              const path = this.normalizeFolderPath(
+                folder?.path || folder?.folderPath || "",
+              );
+              if (!path) return;
+              map.set(path, {
+                ...folder,
+                path,
+                name: folder?.name || path.split("/").pop() || path,
+                fileCount: Number(folder?.fileCount || 0),
+              });
+            });
+            return Array.from(map.values());
+          },
+
           async fetchUploadFolders(force = false) {
             if (this.isGuest) return;
             if (this.uploadFoldersLoading) return;
             if (this.uploadFoldersFetched && !force) return;
 
             this.uploadFoldersLoading = true;
+            let unauthorized = false;
+            let lastError = "";
             try {
-              const response = await fetch("/api/manage/folders?storage=all", {
-                method: "GET",
-                credentials: "include",
-              });
-              if (response.status === 401 || response.status === 403) {
-                this.uploadFolders = [];
-                this.uploadFoldersFetched = true;
+              const endpoints = [
+                "/api/manage/folders?storage=all",
+                "/api/manage/list?includeFolders=1&limit=1",
+              ];
+              const merged = new Map();
+
+              for (const endpoint of endpoints) {
+                const response = await fetch(endpoint, {
+                  method: "GET",
+                  credentials: "include",
+                });
+                if (response.status === 401 || response.status === 403) {
+                  unauthorized = true;
+                  break;
+                }
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.success === false) {
+                  lastError = data.error || "目录读取失败";
+                  continue;
+                }
+                this.normalizeUploadFolderList(data.folders).forEach((folder) => {
+                  merged.set(folder.path, folder);
+                });
+              }
+
+              if (unauthorized) {
+                this.uploadFoldersFetched = false;
+                if (force) {
+                  this.showToast("需要先登录管理后台后才能读取已有目录", "error");
+                }
                 return;
               }
-              const data = await response.json();
-              if (!response.ok || !data.success) {
-                throw new Error(data.error || "目录读取失败");
+
+              if (merged.size === 0 && lastError) {
+                throw new Error(lastError);
               }
-              this.uploadFolders = Array.isArray(data.folders) ? data.folders : [];
+
+              this.uploadFolders = Array.from(merged.values());
               if (this.folderPath) this.ensureUploadFolderLocal(this.folderPath);
               this.uploadFoldersFetched = true;
             } catch (error) {
